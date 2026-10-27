@@ -1,0 +1,312 @@
+From 8173ed12c586acbc7f15fbbca398a9c9cf19ba13 Mon Sep 17 00:00:00 2001
+From: Vadim Kalduzov <vadimkalduzov05@gmail.com>
+Date: Thu, 17 Sep 2026 11:08:21 +0400
+Subject: [PATCH] ramips: add support for D-Link DIR-1260 R1
+
+The D-Link DIR-1260 R1 is an AC1200 dual-band gigabit router based on
+the MediaTek MT7621DAT SoC.
+
+Hardware Specifications:
+- SoC: MediaTek MT7621DAT (880 MHz, 2 cores / 4 threads)
+- RAM: 128 MB DDR3
+- Storage: 128 MB Parallel NAND (Winbond W29N01HVSINA)
+- Wi-Fi 2.4 GHz: MediaTek MT7603E (802.11b/g/n, 2T2R)
+- Wi-Fi 5 GHz: MediaTek MT7613BEN (mt7615/mt7663 firmware, 802.11a/n/ac)
+- Ethernet: 5x 10/100/1000 Mbps (1 WAN, 4 LAN)
+- USB: 1x USB 2.0 Type-A (xHCI controller, requires kmod-usb3)
+- Buttons: Reset, WPS
+- LEDs: Power (White/Orange), WAN (White/Orange)
+
+MAC Address Allocation:
+- Factory partition contains base MAC at offset 0x4
+- LAN (gmac0): base MAC - 1
+- WAN (switch port 4): base MAC + 1
+- 2.4 GHz (pcie0): base MAC + 0
+- 5 GHz (pcie1): factory offset 0x8004 + 0
+
+Installation from OEM firmware:
+1. Downgrade OEM firmware to stock version 4.0.1 (newer versions block
+   flashing third-party firmware via recovery mode).
+2. Power off the router.
+3. Press and hold the Reset button while plugging in the power cord.
+4. Hold Reset until the Power LED starts blinking orange (~10s)
+   to enter Recovery Mode.
+5. Set the PC network adapter to static IP 192.168.0.2 / 24.
+6. Open http://192.168.0.1 in a web browser.
+7. Select the OpenWrt "*factory.bin" image and click "Upload".
+8. Wait for flashing to complete and router to automatically reboot.
+
+Upgrade from OpenWrt:
+- Standard sysupgrade is supported using the "*sysupgrade.bin" image
+  (identical to DIR-2150), via LuCI web interface or CLI:
+  sysupgrade -v <path-to-sysupgrade.bin>
+
+Signed-off-by: Vadim Kalduzov <vadimkalduzov05@gmail.com>
+---
+ .../ramips/dts/mt7621_dlink_dir-1260-r1.dts   | 202 ++++++++++++++++++
+ target/linux/ramips/image/mt7621.mk           |  12 ++
+ .../mt7621/base-files/etc/board.d/01_leds     |   3 +
+ .../mt7621/base-files/lib/upgrade/platform.sh |   1 +
+ 4 files changed, 218 insertions(+)
+ create mode 100644 target/linux/ramips/dts/mt7621_dlink_dir-1260-r1.dts
+
+diff --git a/target/linux/ramips/dts/mt7621_dlink_dir-1260-r1.dts b/target/linux/ramips/dts/mt7621_dlink_dir-1260-r1.dts
+new file mode 100644
+index 0000000000..98a5ef7918
+--- /dev/null
++++ b/target/linux/ramips/dts/mt7621_dlink_dir-1260-r1.dts
+@@ -0,0 +1,202 @@
++// SPDX-License-Identifier: GPL-2.0-or-later OR MIT
++
++#include "mt7621.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/leds/common.h>
++
++/ {
++	compatible = "dlink,dir-1260-r1", "mediatek,mt7621-soc";
++	model = "D-Link DIR-1260 R1";
++
++	aliases {
++		label-mac-device = &gmac0;
++		led-boot = &led_power_orange;
++		led-failsafe = &led_power_orange;
++		led-running = &led_power_white;
++		led-upgrade = &led_power_orange;
++	};
++
++	keys {
++		compatible = "gpio-keys";
++
++		reset {
++			label = "reset";
++			gpios = <&gpio 15 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_RESTART>;
++		};
++
++		wps {
++			label = "wps";
++			gpios = <&gpio 14 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_WPS_BUTTON>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		led_power_white: led-power-white {
++			function = LED_FUNCTION_POWER;
++			color = <LED_COLOR_ID_WHITE>;
++			gpios = <&gpio 16 GPIO_ACTIVE_LOW>;
++		};
++
++		led_power_orange: led-power-orange {
++			function = LED_FUNCTION_POWER;
++			color = <LED_COLOR_ID_ORANGE>;
++			gpios = <&gpio 4 GPIO_ACTIVE_LOW>;
++		};
++
++		led-wan-white {
++			function = LED_FUNCTION_WAN;
++			color = <LED_COLOR_ID_WHITE>;
++			gpios = <&gpio 7 GPIO_ACTIVE_LOW>;
++		};
++
++		led-wan-orange {
++			function = LED_FUNCTION_WAN;
++			color = <LED_COLOR_ID_ORANGE>;
++			gpios = <&gpio 8 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
++
++&pcie {
++	status = "okay";
++};
++
++&pcie0 {
++	wifi0: wifi@0,0 {
++		compatible = "mediatek,mt76";
++		reg = <0x0000 0 0 0 0>;
++		ieee80211-freq-limit = <2400000 2500000>;
++		nvmem-cells = <&eeprom_factory_0>, <&macaddr_factory_4 0>;
++		nvmem-cell-names = "eeprom", "mac-address";
++		led {
++			led-active-low;
++		};
++	};
++};
++
++&pcie1 {
++	wifi1: wifi@0,0 {
++		compatible = "mediatek,mt76";
++		reg = <0x0000 0 0 0 0>;
++		ieee80211-freq-limit = <5000000 6000000>;
++		nvmem-cells = <&eeprom_factory_8000>, <&macaddr_factory_8004 0>;
++		nvmem-cell-names = "eeprom", "mac-address";
++		led {
++			led-active-low;
++		};
++	};
++};
++
++&gmac0 {
++	nvmem-cells = <&macaddr_factory_4 (-1)>;
++	nvmem-cell-names = "mac-address";
++};
++
++&switch0 {
++	ports {
++		port@0 {
++			status = "okay";
++			label = "lan4";
++		};
++
++		port@1 {
++			status = "okay";
++			label = "lan3";
++		};
++
++		port@2 {
++			status = "okay";
++			label = "lan2";
++		};
++
++		port@3 {
++			status = "okay";
++			label = "lan1";
++		};
++
++		wan: port@4 {
++			status = "okay";
++			label = "wan";
++			nvmem-cells = <&macaddr_factory_4 1>;
++			nvmem-cell-names = "mac-address";
++		};
++	};
++};
++
++&state_default {
++	gpio {
++		groups = "i2c", "uart3", "jtag", "wdt";
++		function = "gpio";
++	};
++};
++
++&nand {
++	status = "okay";
++
++	partitions {
++		compatible = "fixed-partitions";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition@0 {
++			label = "Bootloader";
++			reg = <0x0 0x80000>;
++			read-only;
++		};
++
++		partition@80000 {
++			label = "config";
++			reg = <0x80000 0x80000>;
++		};
++
++		factory: partition@100000 {
++			label = "factory";
++			reg = <0x100000 0x40000>;
++			read-only;
++		};
++
++		partition@140000 {
++			label = "firmware";
++			compatible = "denx,uimage";
++			reg = <0x140000 0x7e40000>;
++		};
++
++		partition@7f80000 {
++			label = "reserve";
++			reg = <0x7f80000 0x80000>;
++		};
++	};
++};
++
++&factory {
++	nvmem-layout {
++		compatible = "fixed-layout";
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		eeprom_factory_0: eeprom@0 {
++			reg = <0x0 0x4da8>;
++		};
++
++		eeprom_factory_8000: eeprom@8000 {
++			reg = <0x8000 0x4da8>;
++		};
++
++		macaddr_factory_4: macaddr@4 {
++			compatible = "mac-base";
++			reg = <0x4 0x6>;
++			#nvmem-cell-cells = <1>;
++		};
++
++		macaddr_factory_8004: macaddr@8004 {
++			compatible = "mac-base";
++			reg = <0x8004 0x6>;
++			#nvmem-cell-cells = <1>;
++		};
++	};
++};
+diff --git a/target/linux/ramips/image/mt7621.mk b/target/linux/ramips/image/mt7621.mk
+index 9b4459ffad..6c10104565 100644
+--- a/target/linux/ramips/image/mt7621.mk
++++ b/target/linux/ramips/image/mt7621.mk
+@@ -998,6 +998,18 @@ define Device/dlink_dir_nand_128m
+ 	check-size
+ endef
+ 
++define Device/dlink_dir-1260-r1
++  $(Device/nand)
++  DEVICE_VENDOR := D-Link
++  DEVICE_MODEL := DIR-1260
++  DEVICE_VARIANT := R1
++  IMAGE_SIZE := 129280k
++  IMAGES += factory.bin
++  IMAGE/factory.bin := append-kernel | pad-to $$(KERNEL_SIZE) | append-ubi | check-size
++  DEVICE_PACKAGES := -uboot-envtools kmod-mt7603 kmod-mt7615e kmod-mt7663-firmware-ap kmod-usb3
++endef
++TARGET_DEVICES += dlink_dir-1260-r1
++
+ define Device/dlink_dir-1360-a1
+   $(Device/dlink_dir_nand_128m)
+   DEVICE_VENDOR := D-Link
+diff --git a/target/linux/ramips/mt7621/base-files/etc/board.d/01_leds b/target/linux/ramips/mt7621/base-files/etc/board.d/01_leds
+index de807dd2e9..36edc63d6f 100644
+--- a/target/linux/ramips/mt7621/base-files/etc/board.d/01_leds
++++ b/target/linux/ramips/mt7621/base-files/etc/board.d/01_leds
+@@ -104,6 +104,9 @@ dlink,dap-x1860-a1)
+ 	ucidef_set_led_rssi "rssimediumhigh" "RSSIMEDIUMHIGH" "green:rssimedium" "wlan1" "51" "100"
+ 	ucidef_set_led_rssi "rssihigh" "RSSIHIGH" "green:rssihigh" "wlan1" "76" "100"
+ 	;;
++dlink,dir-1260-r1)
++	ucidef_set_led_netdev "wan" "wan" "white:wan" "wan" "link tx rx"
++	;;
+ dlink,dir-1360-a1)
+ 	ucidef_set_led_default "power" "Power" "white:power" "1"
+ 	ucidef_set_led_netdev "internet" "Internet" "white:wan" "wan"
+diff --git a/target/linux/ramips/mt7621/base-files/lib/upgrade/platform.sh b/target/linux/ramips/mt7621/base-files/lib/upgrade/platform.sh
+index f6bd53ab30..9ee3348c80 100644
+--- a/target/linux/ramips/mt7621/base-files/lib/upgrade/platform.sh
++++ b/target/linux/ramips/mt7621/base-files/lib/upgrade/platform.sh
+@@ -85,6 +85,7 @@ platform_do_upgrade() {
+ 	belkin,rt1800|\
+ 	dlink,covr-x1860-a1|\
+ 	dlink,dap-x1860-a1|\
++	dlink,dir-1260-r1|\
+ 	dlink,dir-1360-a1|\
+ 	dlink,dir-1960-a1|\
+ 	dlink,dir-2055-a1|\
+-- 
+2.56.0
+
