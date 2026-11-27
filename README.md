@@ -10,9 +10,9 @@
 Device support for the **D-Link DIR-1260 Revision R1** wireless router (`ramips/mt7621` target), submitted upstream in [OpenWrt Pull Request #25233](https://github.com/openwrt/openwrt/pull/25233).
 
 ### Overview & Changes
-- **Upstream Codebase Adaptation:** Reworked an [initial community patch](https://github.com/Lucky1openwrt/openwrt/commit/b03f52df9c7f1b5490607926dbf0256065705f24) by `Lucky1openwrt` (originally written for OpenWrt `24.10.x`) for the current OpenWrt `main` tree and `25.12.6` release. Consolidated three separate DTS/DTSI files into a single self-contained `mt7621_dlink_dir-1260-r1.dts` and replaced deprecated `$(Device/dsa-migration)` and `openwrt,uimage` definitions with standard `$(Device/nand)` and `denx,uimage` bindings.
+- **Upstream Codebase Adaptation:** Reworked an [initial community patch](https://github.com/Lucky1openwrt/openwrt/commit/b03f52df9c7f1b5490607926dbf0256065705f24) by `Lucky1openwrt` (originally written for OpenWrt `24.10.x`) for the current OpenWrt `main` tree and `25.12.x` release branch (verified on `25.12.5` and `25.12.6`). Consolidated three separate DTS/DTSI files into a single self-contained `mt7621_dlink_dir-1260-r1.dts` and replaced deprecated `$(Device/dsa-migration)` and `openwrt,uimage` definitions with standard `$(Device/nand)` and `denx,uimage` bindings.
 - **NAND Capacity & Partition Protection:** Replaced the hardcoded `40960k` (40 MB) `IMAGE_SIZE` limit in `mt7621.mk` with `129280k` to utilize the full `0x7e40000` (126.25 MB) `firmware` partition on the 128 MB NAND (~100 MB usable UBI overlay space), and marked the `factory` partition (`0x100000`) as `read-only` to protect radio calibration data and MAC addresses.
-- **LED Configuration Fixes:** Removed non-existent WLAN 2.4 GHz / 5 GHz LED definitions from DTS (not present on DIR-1260 R1 hardware), fixed `led-wan-orange` GPIO polarity (`GPIO_ACTIVE_HIGH` to `GPIO_ACTIVE_LOW`), reassigned `led-upgrade` to the orange Power LED, and simplified `01_leds` to drive `white:wan` (`link tx rx`).
+- **LED Configuration Fixes:** Fixed Power, WAN (Internet), and 2.4 GHz WLAN LEDs — removed invalid `gpio 37`/`38` entries from `gpio-leds`, fixed `led-wan-orange` GPIO polarity (`GPIO_ACTIVE_HIGH` to `GPIO_ACTIVE_LOW`), reassigned `led-upgrade` to the orange Power LED, and simplified `01_leds` to drive `white:wan` (`link tx rx`).
 - **Device Packages & USB Support:** Included `kmod-usb3` in `DEVICE_PACKAGES` to enable the physical USB 2.0 Type-A port via the SoC xHCI controller, and added `-uboot-envtools` to omit unused U-Boot environment utilities.
 
 ### Hardware Specifications
@@ -24,7 +24,7 @@ Device support for the **D-Link DIR-1260 Revision R1** wireless router (`ramips/
 - **Wi-Fi 5 GHz:** MediaTek MT7613BEN (`mt7615e` driver / `mt7663` AP firmware, 802.11a/n/ac)
 - **USB:** 1x USB 2.0 Type-A (SoC xHCI controller, requires `kmod-usb3`)
 - **Buttons:** Reset (`gpio 15`), WPS (`gpio 14`)
-- **LEDs:** Power (White: `gpio 16`, Orange: `gpio 4`), WAN (White: `gpio 7`, Orange: `gpio 8`)
+- **LEDs:** Power (White: `gpio 16`, Orange: `gpio 4`), WAN (White: `gpio 7`, Orange: `gpio 8`), WLAN 2.4 GHz (`mt7603e`), WLAN 5 GHz (permanently off)
 
 ### Partition Layout & Hardware Configuration
 - **NAND Flash Partitions:** Preserves the factory partition table:
@@ -47,7 +47,7 @@ Device support for the **D-Link DIR-1260 Revision R1** wireless router (`ramips/
 3. Press and hold the **Reset** button while plugging in the power cord.
 4. Keep holding Reset until the Power LED starts blinking orange (~10 seconds) to enter U-Boot Web Recovery Mode.
 5. Set the host PC network adapter to static IP `192.168.0.2/24` (`255.255.255.0`).
-6. Open `[http://192.168.0.1](http://192.168.0.1)` in a web browser.
+6. Open `http://192.168.0.1` in a web browser.
 7. Select the OpenWrt `*factory.bin` image and click **Upload**.
 8. Wait for flashing to complete and the router to automatically reboot.
 
@@ -58,7 +58,7 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
 ```
 
 ### Testing & Verification
-- Built and verified on both current OpenWrt `main` and `25.12.6` release trees.
+- Built and verified on OpenWrt `main` and `25.12.x` (`25.12.5` and `25.12.6` builds).
 - `scripts/checkpatch.pl` (0 errors, 0 warnings) and upstream `FormalityCheck` CI checks passed.
 - **Verified on Physical Hardware:**
   - Initial flashing via OEM recovery (`factory.bin`) and `sysupgrade` (`sysupgrade.bin`)
@@ -67,8 +67,9 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
   - 2.4 GHz Wi-Fi (`MT7603E`) and 5 GHz Wi-Fi (`MT7613BEN` / `mt7663` AP firmware)
   - USB 2.0 host port (`kmod-usb3`)
   - Reset and WPS hardware buttons
-  - Power (White/Orange) and WAN (White) status LEDs
+  - Power (White/Orange), WAN (White), and WLAN 2.4 GHz LEDs
   - Upstream kernel module (`kmod-*`) installation via `apk` without ABI / `vermagic` mismatches
+- **Known Issue:** The 5 GHz WLAN LED remains permanently off.
 
 ### Modified Files
 - `target/linux/ramips/dts/mt7621_dlink_dir-1260-r1.dts` — Self-contained Device Tree source (peripherals, NAND partitions, NVMEM layout, GPIO).
@@ -84,9 +85,9 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
 針對 **D-Link DIR-1260 R1** 無線路由器的 OpenWrt 裝置支援配置（`ramips/mt7621` 目標平台），相關變更已提交至上游 [OpenWrt Pull Request #25233](https://github.com/openwrt/openwrt/pull/25233)。
 
 ### 概述與主要修改
-- **上游主線與版本適配：** 基於社群開發者 `Lucky1openwrt` 針對 OpenWrt `24.10.x` 的[初始補丁](https://github.com/Lucky1openwrt/openwrt/commit/b03f52df9c7f1b5490607926dbf0256065705f24)，重構並適配至現行 OpenWrt `main` 主線與 `25.12.6` 發行版。將原先分散的三個 DTS/DTSI 檔案整合為單一獨立的 `mt7621_dlink_dir-1260-r1.dts`，並將已棄用的 `$(Device/dsa-migration)` 與 `openwrt,uimage` 替換為標準 `$(Device/nand)` 與 `denx,uimage` 定義。
+- **上游主線與版本適配：** 基於社群開發者 `Lucky1openwrt` 針對 OpenWrt `24.10.x` 的[初始補丁](https://github.com/Lucky1openwrt/openwrt/commit/b03f52df9c7f1b5490607926dbf0256065705f24)，重構並適配至現行 OpenWrt `main` 主線與 `25.12.x` 發行分支（已於 `25.12.5` 與 `25.12.6` 驗證）。將原先分散的三個 DTS/DTSI 檔案整合為單一獨立的 `mt7621_dlink_dir-1260-r1.dts`，並將已棄用的 `$(Device/dsa-migration)` 與 `openwrt,uimage` 替換為標準 `$(Device/nand)` 與 `denx,uimage` 定義。
 - **NAND 容量與分區保護：** 將 `mt7621.mk` 中寫死的 `40960k`（40 MB）`IMAGE_SIZE` 上限調整為 `129280k`，以完整利用 128 MB NAND 上的 `0x7e40000`（126.25 MB）`firmware` 分區（提供約 100 MB 可用 UBI Overlay 空間）；同時將 `factory` 分區（`0x100000`）設為唯讀（`read-only`），保護無線校準資料與 MAC 位址。
-- **LED 指示燈配置修正：** 移除硬體上並不存在的 WLAN 2.4 GHz / 5 GHz 指示燈節點，修正 `led-wan-orange` 的 GPIO 極性（由 `GPIO_ACTIVE_HIGH` 改為 `GPIO_ACTIVE_LOW`），將 `led-upgrade` 改為對應橘色 Power 指示燈，並精簡 `01_leds` 僅保留 `white:wan`（`link tx rx`）。
+- **LED 指示燈配置修正：** 修正 Power、WAN（網際網路）與 WLAN 2.4 GHz 指示燈——移除 `gpio-leds` 中無效的 `gpio 37`/`38` 定義，修正 `led-wan-orange` 的 GPIO 極性（由 `GPIO_ACTIVE_HIGH` 改為 `GPIO_ACTIVE_LOW`），將 `led-upgrade` 改為對應橘色 Power 指示燈，並精簡 `01_leds` 僅保留 `white:wan`（`link tx rx`）。
 - **預設套件與 USB 支援：** 於 `DEVICE_PACKAGES` 加入 `kmod-usb3`，透過 SoC 內建的 xHCI 控制器啟用實體 USB 2.0 Type-A 連接埠，並加入 `-uboot-envtools` 排除未使用的 U-Boot 環境工具。
 
 ### 硬體規格
@@ -98,7 +99,7 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
 - **Wi-Fi 5 GHz：** MediaTek MT7613BEN（`mt7615e` 驅動 / `mt7663` AP 韌體，802.11a/n/ac）
 - **USB：** 1x USB 2.0 Type-A（SoC xHCI 控制器，需搭配 `kmod-usb3`）
 - **按鍵：** Reset (`gpio 15`), WPS (`gpio 14`)
-- **LED 指示燈：** Power（白光: `gpio 16`, 橘光: `gpio 4`）、WAN（白光: `gpio 7`, 橘光: `gpio 8`）
+- **LED 指示燈：** Power（白光: `gpio 16`, 橘光: `gpio 4`）、WAN（白光: `gpio 7`, 橘光: `gpio 8`）、WLAN 2.4 GHz（`mt7603e`）、WLAN 5 GHz（目前永久熄滅）
 
 ### 分區與硬體配置
 - **NAND Flash 分區：** 保留原廠分區表：
@@ -121,7 +122,7 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
 3. 按住 **Reset** 鍵不放，同時接上電源線。
 4. 持續按住 Reset 鍵直到電源燈開始閃爍橘光（約 10 秒），進入 U-Boot Web Recovery 模式。
 5. 將電腦網路介面卡設為固定 IP `192.168.0.2/24`（子網路遮罩 `255.255.255.0`）。
-6. 使用瀏覽器開啟 `[http://192.168.0.1](http://192.168.0.1)`。
+6. 使用瀏覽器開啟 `http://192.168.0.1`。
 7. 選擇 OpenWrt `*factory.bin` 映像檔並點擊 **Upload**。
 8. 等待刷寫完成，路由器將會自動重新啟動。
 
@@ -132,7 +133,7 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
 ```
 
 ### 測試與驗證
-- 已於 OpenWrt `main` 主線與 `25.12.6` 發行版原始碼樹中完成編譯與驗證。
+- 已於 OpenWrt `main` 主線與 `25.12.x`（`25.12.5`、`25.12.6` 編譯版本）原始碼樹中完成編譯與驗證。
 - 通過 `scripts/checkpatch.pl`（0 錯誤、0 警告）與上游 `FormalityCheck` CI 檢查。
 - **實體硬體驗證項目：**
   - 透過 OEM 救援模式刷入 `factory.bin` 與執行 `sysupgrade`（`sysupgrade.bin`）
@@ -141,8 +142,9 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
   - 2.4 GHz（`MT7603E`）與 5 GHz（`MT7613BEN` / `mt7663` AP 韌體）無線網路運作
   - USB 2.0 Host 連接埠（`kmod-usb3`）
   - Reset 與 WPS 硬體按鍵
-  - Power（白光/橘光）與 WAN（白光）狀態指示燈
+  - Power（白光/橘光）、WAN（白光）與 WLAN 2.4 GHz 狀態指示燈
   - 透過 `apk` 安裝官方上游核心模組（`kmod-*`），無 ABI / `vermagic` 不相容問題
+- **已知問題：** 5 GHz WLAN 指示燈目前永久熄滅。
 
 ### 修改檔案清單
 - `target/linux/ramips/dts/mt7621_dlink_dir-1260-r1.dts` — 獨立整合的 Device Tree 原始碼（週邊裝置、NAND 分區、NVMEM 配置、GPIO）。
@@ -158,9 +160,9 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
 Поддержка маршрутизатора **D-Link DIR-1260 ревизии R1** в OpenWrt (платформа `ramips/mt7621`), изменения отправлены в апстрим в [OpenWrt Pull Request #25233](https://github.com/openwrt/openwrt/pull/25233).
 
 ### Обзор и основные изменения
-- **Адаптация под актуальную кодовую базу:** за основу взят [исходный патч сообщества](https://github.com/Lucky1openwrt/openwrt/commit/b03f52df9c7f1b5490607926dbf0256065705f24) от `Lucky1openwrt` (написанный для ветки OpenWrt `24.10.x`) и переработан под актуальный `main` и релиз `25.12.6`. Три отдельных файла DTS/DTSI объединены в один самодостаточный `mt7621_dlink_dir-1260-r1.dts`, а устаревшие макросы `$(Device/dsa-migration)` и `openwrt,uimage` заменены на стандартные `$(Device/nand)` и `denx,uimage`.
+- **Адаптация под актуальную кодовую базу:** за основу взят [исходный патч сообщества](https://github.com/Lucky1openwrt/openwrt/commit/b03f52df9c7f1b5490607926dbf0256065705f24) от `Lucky1openwrt` (написанный для ветки OpenWrt `24.10.x`) и переработан под актуальный `main` и релизную ветку `25.12.x` (проверено на сборках `25.12.5` и `25.12.6`). Три отдельных файла DTS/DTSI объединены в один самодостаточный `mt7621_dlink_dir-1260-r1.dts`, а устаревшие макросы `$(Device/dsa-migration)` и `openwrt,uimage` заменены на стандартные `$(Device/nand)` и `denx,uimage`.
 - **Объём NAND и защита разделов:** жёстко заданный лимит `IMAGE_SIZE := 40960k` (40 МБ) в `mt7621.mk` заменён на `129280k` для использования всего раздела `firmware` (`0x7e40000`, 126.25 МБ) на флеш-памяти NAND объёмом 128 МБ (~100 МБ доступного пространства UBI overlay). Раздел `factory` (`0x100000`) переведён в режим `read-only` для защиты калибровочных данных радиомодулей и MAC-адресов.
-- **Исправление конфигурации светодиодов:** из DTS удалены несуществующие у DIR-1260 R1 индикаторы WLAN 2.4 GHz и 5 GHz, исправлена полярность `led-wan-orange` (`GPIO_ACTIVE_HIGH` → `GPIO_ACTIVE_LOW`), алиас `led-upgrade` переназначен на оранжевый индикатор питания, а в `01_leds` оставлен только триггер `white:wan` (`link tx rx`).
+- **Исправление конфигурации светодиодов:** восстановлена работа индикаторов Power, WAN (Internet) и WLAN 2.4 GHz — из `gpio-leds` удалены некорректные записи `gpio 37`/`38`, исправлена полярность `led-wan-orange` (`GPIO_ACTIVE_HIGH` → `GPIO_ACTIVE_LOW`), алиас `led-upgrade` переназначен на оранжевый индикатор питания, а в `01_leds` оставлен только триггер `white:wan` (`link tx rx`).
 - **Пакеты сборки и поддержка USB:** в `DEVICE_PACKAGES` включён пакет `kmod-usb3` для работы порта USB 2.0 Type-A через контроллер xHCI в SoC, а также добавлен `-uboot-envtools` для исключения неиспользуемых утилит U-Boot.
 
 ### Аппаратные характеристики
@@ -172,7 +174,7 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
 - **Wi-Fi 5 ГГц:** MediaTek MT7613BEN (драйвер `mt7615e` / прошивка `mt7663` AP, 802.11a/n/ac)
 - **USB:** 1 порт USB 2.0 Type-A (контроллер xHCI в SoC, требуется `kmod-usb3`)
 - **Кнопки:** Reset (`gpio 15`), WPS (`gpio 14`)
-- **Индикаторы:** Power (Белый: `gpio 16`, Оранжевый: `gpio 4`), WAN (Белый: `gpio 7`, Оранжевый: `gpio 8`)
+- **Индикаторы:** Power (Белый: `gpio 16`, Оранжевый: `gpio 4`), WAN (Белый: `gpio 7`, Оранжевый: `gpio 8`), WLAN 2.4 GHz (`mt7603e`), WLAN 5 GHz (перманентно отключён)
 
 ### Разметка памяти и конфигурация
 - **Разделы NAND Flash:** сохранена заводская таблица разделов:
@@ -195,7 +197,7 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
 3. Зажмите кнопку **Reset** и, удерживая её, подключите кабель питания.
 4. Удерживайте Reset до тех пор, пока индикатор Power не начнёт мигать оранжевым (~10 секунд) для входа в режим U-Boot Web Recovery.
 5. Назначьте сетевому адаптеру ПК статический IP-адрес `192.168.0.2/24` (`255.255.255.0`).
-6. Откройте `[http://192.168.0.1](http://192.168.0.1)` в браузере.
+6. Откройте `http://192.168.0.1` в браузере.
 7. Выберите образ OpenWrt `*factory.bin` и нажмите **Upload**.
 8. Дождитесь завершения прошивки и автоматической перезагрузки устройства.
 
@@ -206,7 +208,7 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
 ```
 
 ### Тестирование и проверка
-- Сборка выполнена и проверена как на актуальной ветке `main`, так и на релизной кодовой базе `25.12.6`.
+- Сборка выполнена и проверена как на актуальной ветке `main`, так и на релизной ветке `25.12.x` (сборки `25.12.5` и `25.12.6`).
 - Проверки `scripts/checkpatch.pl` (0 ошибок, 0 предупреждений) и апстрим-CI `FormalityCheck` пройдены без замечаний.
 - **Проверено на физическом устройстве:**
   - Первичная прошивка через режим восстановления OEM (`factory.bin`) и обновление через `sysupgrade` (`sysupgrade.bin`)
@@ -215,8 +217,9 @@ sysupgrade -v openwrt-ramips-mt7621-dlink_dir-1260-r1-squashfs-sysupgrade.bin
   - Работа Wi-Fi 2.4 ГГц (`MT7603E`) и 5 ГГц (`MT7613BEN` / прошивка `mt7663` AP)
   - Работа порта USB 2.0 Host (`kmod-usb3`)
   - Аппаратные кнопки Reset и WPS
-  - Индикаторы состояния Power (Белый/Оранжевый) и WAN (Белый)
+  - Индикаторы состояния Power (Белый/Оранжевый), WAN (Белый) и WLAN 2.4 GHz
   - Установка официальных модулей ядра (`kmod-*`) из репозиториев OpenWrt через `apk` без несовпадений ABI / `vermagic`
+- **Известная проблема:** светодиодный индикатор WLAN 5 GHz перманентно отключён.
 
 ### Изменённые файлы
 - `target/linux/ramips/dts/mt7621_dlink_dir-1260-r1.dts` — самодостаточный исходный код Device Tree (периферия, разделы NAND, разметка NVMEM, GPIO).
